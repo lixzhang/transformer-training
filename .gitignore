@@ -1,0 +1,6 @@
+__pycache__
+custom_tokenizer
+pytorch_transformer/saved/
+saved/
+saved_model/
+shakespeare_gpt
