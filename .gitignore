@@ -4,3 +4,5 @@ pytorch_transformer/saved/
 saved/
 saved_model/
 shakespeare_gpt
+out_*
+wandb/

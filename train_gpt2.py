@@ -1,21 +1,34 @@
 from transformers import GPT2Config, GPT2LMHeadModel
 import torch
 import time
-from datetime import timedelta
+from datetime import timedelta, datetime
+import os
+import wandb
 
 torch.manual_seed(1337)
+
+wandb_project = 'gpt2lmheadmodel-shakespeare-char'
+wandb_run_name = 'run-' + str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
 
 # parameters
 max_iters = 5000
 eval_interval = 500
 batch_size = 64
 block_size = 256
-max_new_tokens = 5000
+max_new_tokens = 500
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
 n_embd = 384
 n_head = 6
-n_layer = 3
+n_layer = 6
+
+wandb_config = {'max_iters': max_iters, 'n_embd': n_embd, 'n_head': n_head, 'block_size': block_size, 'n_layer': n_layer}
+
+wandb.init(project=wandb_project, name=wandb_run_name, config=wandb_config)
+
+out_dir = 'out_shakespears_char'
+
+os.makedirs(out_dir, exist_ok=True)
 
 # get data
 with open('input.txt', 'r', encoding='utf-8') as f:
@@ -44,6 +57,7 @@ def get_batch(split):
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack([data[i:i+block_size] for i in ix])
     y = torch.stack([data[i:i+block_size] for i in ix])
+    # y = torch.stack([data[i+1:i+1+block_size] for i in ix])
     x, y = x.to(device), y.to(device)
     return x, y
 
@@ -62,16 +76,6 @@ def estimate_loss():
         out[split] = losses.mean()
     model.train()
     return out 
-
-def generate(idx, max_tokens):
-    # idx is (B, T) array of indices in the current context
-    for _ in range(max_tokens):
-        # crop idx to the last block_size tokens
-        idx_cond = idx[:, -block_size:]
-        idx_next = model.generate(idx_cond, max_new_tokens=1)
-        # append sampled index to the running sequence
-        idx = torch.cat((idx, idx_next[:, -1:]), dim=1) # (B, T+1)
-    return idx
 
 # Define the configuration
 config = GPT2Config(
@@ -96,6 +100,9 @@ config = GPT2Config(
 model = GPT2LMHeadModel(config)
 model.to(device)
 
+best_val_loss = 1e9
+save_direrctory = 'saved_model'
+
 # create a PyTorch optimizer
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 
@@ -104,7 +111,13 @@ for iter in range(max_iters): # increase number of steps for good results...
     if iter % eval_interval == 0:
         losses = estimate_loss()
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-
+        if losses['val'] < best_val_loss:
+             model.save_pretrained(os.path.join(out_dir, save_direrctory))
+        wandb.log({
+            "iter": iter,
+            "train/loss": losses['train'],
+            "val/loss": losses['val'],
+        })
     # sample a batch of data
     xb, yb = get_batch('train')
 
@@ -116,14 +129,5 @@ for iter in range(max_iters): # increase number of steps for good results...
     optimizer.step()
 end_time = time.monotonic()
 print(timedelta(seconds=end_time - start_time))
-with open('training_time.txt', 'w', encoding='utf-8') as f:
+with open(os.path.join(out_dir, 'training_time.txt'), 'w', encoding='utf-8') as f:
 	f.write(str(timedelta(seconds=end_time - start_time)))
-
-save_direrctory = 'saved_model'
-model.save_pretrained(save_direrctory)
-model = GPT2LMHeadModel.from_pretrained(save_direrctory)
-context = torch.zeros((1, 1), dtype=torch.long, device='cpu')
-generated = generate(context, max_new_tokens)[0]
-generated_text = decode(generated.tolist())
-with open('generated.txt', 'w', encoding='utf-8') as f:
-	f.write(generated_text)
