@@ -13,8 +13,8 @@ The above linked repo makes it straightforward to complete the following two tas
 
 What I was interested in was to find out how to:
 
-- use Shakespeare character-level encoding
-- and use transformers.GPT2LMHeadModel from scratch
+- use Shakespeare character-level encoding, to better understand encoding
+- and use transformers.GPT2LMHeadModel from scratch, since transformers package has more modeling options
 
 I thought it should be straightforward. Turns out it's mostly true, except for how to generate data batches for training. Specifically, since I'm useing transformers.GPT2LMHeadModel, I need NOT shift the response by 1. 
 
