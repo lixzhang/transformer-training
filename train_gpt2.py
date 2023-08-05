@@ -56,8 +56,8 @@ def get_batch(split):
     data = train_data if split == 'train' else val_data
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack([data[i:i+block_size] for i in ix])
-    y = torch.stack([data[i:i+block_size] for i in ix])
-    # y = torch.stack([data[i+1:i+1+block_size] for i in ix])
+    y = torch.stack([data[i:i+block_size] for i in ix]) # use this if feeding data to transformers.GPT2LMHeadModel
+    # y = torch.stack([data[i+1:i+1+block_size] for i in ix]) # use this for nanoGPT's GPT class 
     x, y = x.to(device), y.to(device)
     return x, y
 
